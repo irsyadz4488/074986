@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>COVID-19 Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+
+  <header class="bg-blue-700 text-white p-4 shadow">
+    <nav class="container mx-auto flex justify-between items-center">
+      <h1 class="text-2xl font-bold">COVID-19 Dashboard</h1>
+      <ul class="flex space-x-6 text-lg">
+        <li><a href="index.html" class="hover:underline text-white">Home</a></li>
+        <li><a href="covid.html" class="underline text-white">COVID-19 Dashboard</a></li>
+        <li><a href="weather.html" class="hover:underline text-white">Weather Dashboard</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container mx-auto p-6 flex-grow">
+    <section class="bg-white rounded shadow p-6 max-w-4xl mx-auto">
+      <h2 class="text-3xl font-semibold mb-4">Global & Country COVID-19 Stats</h2>
+
+      <label for="countrySelect" class="block mb-2 font-medium">Select Country:</label>
+      <select id="countrySelect" class="border rounded p-2 w-full max-w-xs mb-6"></select>
+
+      <div id="stats" class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center mb-6">
+        <div class="bg-blue-100 p-4 rounded">
+          <h3 class="font-semibold text-lg">Total Cases</h3>
+          <p id="totalCases" class="text-2xl font-bold"></p>
+        </div>
+        <div class="bg-green-100 p-4 rounded">
+          <h3 class="font-semibold text-lg">Recovered</h3>
+          <p id="recovered" class="text-2xl font-bold"></p>
+        </div>
+        <div class="bg-red-100 p-4 rounded">
+          <h3 class="font-semibold text-lg">Deaths</h3>
+          <p id="deaths" class="text-2xl font-bold"></p>
+        </div>
+      </div>
+
+      <canvas id="covidChart" class="max-w-full"></canvas>
+    </section>
+  </main>
+
+  <footer class="bg-blue-700 text-white text-center p-4">
+    &copy; 2025 Muhammad Irsyad. All Rights Reserved.
+  </footer>
+
+  <script>
+    const countrySelect = document.getElementById('countrySelect');
+    const totalCases = document.getElementById('totalCases');
+    const recovered = document.getElementById('recovered');
+    const deaths = document.getElementById('deaths');
+    const ctx = document.getElementById('covidChart').getContext('2d');
+    let covidChart;
+
+    async function fetchCountries() {
+      const res = await fetch('https://disease.sh/v3/covid-19/countries');
+      const data = await res.json();
+      data.forEach(country => {
+        const option = document.createElement('option');
+        option.value = country.country;
+        option.textContent = country.country;
+        countrySelect.appendChild(option);
+      });
+      countrySelect.value = 'Malaysia'; // Default selection
+      fetchDataAndRender(countrySelect.value);
+    }
+
+    async function fetchDataAndRender(country) {
+      try {
+        // Fetch country data
+        const res = await fetch(`https://disease.sh/v3/covid-19/countries/${country}`);
+        const data = await res.json();
+
+        totalCases.textContent = data.cases.toLocaleString();
+        recovered.textContent = data.recovered.toLocaleString();
+        deaths.textContent = data.deaths.toLocaleString();
+
+        // Fetch historical data for chart
+        const resHist = await fetch(`https://disease.sh/v3/covid-19/historical/${country}?lastdays=30`);
+        const histData = await resHist.json();
+
+        const casesTimeline = histData.timeline.cases;
+        const labels = Object.keys(casesTimeline);
+        const values = Object.values(casesTimeline);
+
+        if (covidChart) covidChart.destroy();
+        covidChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Cases (last 30 days)',
+              data: values,
+              borderColor: 'rgb(37, 99, 235)',
+              backgroundColor: 'rgba(37, 99, 235, 0.3)',
+              fill: true,
+              tension: 0.3,
+            }]
+          },
+          options: {
+            responsive: true,
+            interaction: {
+              mode: 'index',
+              intersect: false,
+            },
+            plugins: {
+              legend: {
+                display: true,
+              },
+            },
+            scales: {
+              x: {
+                display: true,
+                title: { display: true, text: 'Date' }
+              },
+              y: {
+                display: true,
+                title: { display: true, text: 'Cases' }
+              }
+            }
+          }
+        });
+      } catch (error) {
+        alert('Error fetching data, please try again later.');
+        console.error(error);
+      }
+    }
+
+    countrySelect.addEventListener('change', e => {
+      fetchDataAndRender(e.target.value);
+    });
+
+    fetchCountries();
+  </script>
+
+</body>
+</html>

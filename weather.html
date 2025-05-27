@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Weather Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+
+  <header class="bg-blue-700 text-white p-4 shadow">
+    <nav class="container mx-auto flex justify-between items-center">
+      <h1 class="text-2xl font-bold">Weather Dashboard</h1>
+      <ul class="flex space-x-6 text-lg">
+        <li><a href="index.html" class="hover:underline text-white">Home</a></li>
+        <li><a href="covid.html" class="hover:underline text-white">COVID-19 Dashboard</a></li>
+        <li><a href="weather.html" class="underline text-white">Weather Dashboard</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container mx-auto p-6 flex-grow">
+    <section class="bg-white rounded shadow p-6 max-w-4xl mx-auto">
+      <h2 class="text-3xl font-semibold mb-4">City Weather & Forecast</h2>
+
+      <form id="cityForm" class="mb-6 flex gap-4 max-w-xs">
+        <input
+          type="text"
+          id="cityInput"
+          placeholder="Enter city name"
+          required
+          class="flex-grow border border-gray-300 rounded p-2 focus:outline-blue-500"
+        />
+        <button
+          type="submit"
+          class="bg-blue-700 text-white px-4 rounded hover:bg-blue-800"
+        >Search</button>
+      </form>
+
+      <div id="weatherInfo" class="mb-6 hidden">
+        <h3 class="text-2xl font-semibold mb-2" id="cityName"></h3>
+        <p id="weatherDesc" class="text-lg mb-1"></p>
+        <p class="mb-1"><strong>Temperature:</strong> <span id="temp"></span> °C</p>
+        <p class="mb-1"><strong>Humidity:</strong> <span id="humidity"></span>%</p>
+        <p class="mb-1"><strong>Wind Speed:</strong> <span id="windSpeed"></span> m/s</p>
+      </div>
+
+      <canvas id="forecastChart"></canvas>
+    </section>
+  </main>
+
+  <footer class="bg-blue-700 text-white text-center p-4">
+    &copy; 2025 Muhammad Irsyad. All Rights Reserved.
+  </footer>
+
+  <script>
+    const apiKey = '7ed4a0d9bb278d5fcdad84dede7886f1'; // Replace with your OpenWeather API key
+    const cityForm = document.getElementById('cityForm');
+    const cityInput = document.getElementById('cityInput');
+    const weatherInfo = document.getElementById('weatherInfo');
+    const cityName = document.getElementById('cityName');
+    const weatherDesc = document.getElementById('weatherDesc');
+    const temp = document.getElementById('temp');
+    const humidity = document.getElementById('humidity');
+    const windSpeed = document.getElementById('windSpeed');
+    const ctx = document.getElementById('forecastChart').getContext('2d');
+    let forecastChart;
+
+    cityForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const city = cityInput.value.trim();
+      if (!city) return;
+
+      try {
+        // Fetch current weather
+        const currentRes = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&appid=${apiKey}`);
+        if (!currentRes.ok) throw new Error('City not found');
+        const currentData = await currentRes.json();
+
+        cityName.textContent = `${currentData.name}, ${currentData.sys.country}`;
+        weatherDesc.textContent = currentData.weather[0].description;
+        temp.textContent = currentData.main.temp.toFixed(1);
+        humidity.textContent = currentData.main.humidity;
+        windSpeed.textContent = currentData.wind.speed;
+
+        weatherInfo.classList.remove('hidden');
+
+        // Fetch 5-day forecast (3-hour interval)
+        const forecastRes = await fetch(`https://api.openweathermap.org/data/2.5/forecast?q=${city}&units=metric&appid=${apiKey}`);
+        const forecastData = await forecastRes.json();
+
+        // Prepare data for chart: daily average temperatures for next 5 days
+        const dailyTemps = {};
+        forecastData.list.forEach(item => {
+          const date = item.dt_txt.split(' ')[0];
+          if (!dailyTemps[date]) dailyTemps[date] = [];
+          dailyTemps[date].push(item.main.temp);
+        });
+
+        const labels = Object.keys(dailyTemps).slice(0, 5);
+        const avgTemps = labels.map(date => {
+          const temps = dailyTemps[date];
+          return (temps.reduce((a, b) => a + b, 0) / temps.length).toFixed(1);
+        });
+
+        if (forecastChart) forecastChart.destroy();
+        forecastChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Avg Temperature (°C)',
+              data: avgTemps,
+              borderColor: 'rgb(37, 99, 235)',
+              backgroundColor: 'rgba(37, 99, 235, 0.3)',
+              fill: true,
+              tension: 0.3,
+            }]
+          },
+          options: {
+            responsive: true,
+            interaction: {
+              mode: 'index',
+              intersect: false,
+            },
+            plugins: {
+              legend: {
+                display: true,
+              },
+            },
+            scales: {
+              x: {
+                display: true,
+                title: { display: true, text: 'Date' }
+              },
+              y: {
+                display: true,
+                title: { display: true, text: 'Temperature (°C)' }
+              }
+            }
+          }
+        });
+
+      } catch (error) {
+        alert(error.message || 'Failed to fetch weather data.');
+        weatherInfo.classList.add('hidden');
+        if (forecastChart) forecastChart.destroy();
+      }
+    });
+  </script>
+
+</body>
+</html>
